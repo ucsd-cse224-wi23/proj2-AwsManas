@@ -8,6 +8,8 @@ type Response struct {
 	// Headers stores all headers to write to the response.
 	Headers map[string]string
 
+	OptionalBody []byte
+
 	// Request is the valid request that leads to this response.
 	// It could be nil for responses not resulting from a valid request.
 	// Hint: you might need this to handle the "Connection: Close" requirement
