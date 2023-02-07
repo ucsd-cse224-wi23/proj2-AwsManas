@@ -131,7 +131,7 @@ func (s *Server) handleConnection(conn net.Conn) {
 			return
 		}
 
-		if strings.HasPrefix(req.URL, "/") {
+		if !strings.HasPrefix(req.URL, "/") {
 			res := &Response{}
 			res.send_static_400()
 			err = res.Write(conn)
@@ -339,7 +339,7 @@ func ReadRequest(br *bufio.Reader) (req *Request, err error) {
 		fmt.Println("NOP Error occured : ", err.Error())
 		return nil, badStringError("malformed start line", line)
 	}
-	if req.Proto == "HTTP/1.1" {
+	if req.Proto != "HTTP/1.1" {
 		return nil, badStringError("malformed header", line)
 	}
 	req.URL, err = parseRequestLine(line, 1)
