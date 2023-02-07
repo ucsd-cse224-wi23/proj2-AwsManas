@@ -119,7 +119,7 @@ func (s *Server) handleConnection(conn net.Conn) {
 		}
 
 		if err != nil {
-			fmt.Printf("Handle bad request for error , sending 404: %v", err)
+			fmt.Printf("Handle bad request for error , sending 400: %v", err)
 			res := &Response{}
 			res.send_static_400()
 			err = res.Write(conn)
@@ -249,6 +249,7 @@ func (res *Response) send_static_400() {
 		CanonicalHeaderKey("Connection"): "close",
 	}
 	res.Headers = tmp
+	fmt.Println("Sending back 400 response with following header :-", res)
 }
 
 func (res *Response) send_static_404() {
@@ -259,6 +260,7 @@ func (res *Response) send_static_404() {
 		CanonicalHeaderKey("Date"): string(FormatTime(time.Now())),
 	}
 	res.Headers = tmp
+	fmt.Println("Sending back 404 response with following header :-", res)
 }
 
 func (res *Response) send_static(url string, close bool) {
@@ -288,6 +290,8 @@ func (res *Response) send_static(url string, close bool) {
 	}
 	res.Headers = tmp
 	res.OptionalBody = data
+
+	fmt.Println("Sending back 200 response with following header :-", res)
 }
 
 func (res *Response) Write(w io.Writer) error {
