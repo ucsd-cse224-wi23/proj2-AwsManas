@@ -90,20 +90,20 @@ func (s *Server) handleConnection(conn net.Conn) {
 	for {
 
 		if err := conn.SetReadDeadline(time.Now().Add(5 * time.Second)); err != nil {
-			log.Printf("Failed to set timeout for connection %v", conn)
+			fmt.Printf("Failed to set timeout for connection %v \n", conn)
 			_ = conn.Close()
 			return
 		}
 		req, err := ReadRequest(br)
 
 		if errors.Is(err, io.EOF) {
-			log.Printf("Connection closed by %v", conn.RemoteAddr())
+			fmt.Printf("Connection closed by %v \n", conn.RemoteAddr())
 			_ = conn.Close()
 			return
 		}
 
 		if err, ok := err.(net.Error); ok && err.Timeout() {
-			log.Printf("Connection to %v timed out", conn.RemoteAddr())
+			fmt.Printf("Connection to %v timed out", conn.RemoteAddr())
 			// Sending 400
 			if req.Method != "" {
 				res := &Response{}
@@ -119,7 +119,7 @@ func (s *Server) handleConnection(conn net.Conn) {
 		}
 
 		if err != nil {
-			log.Printf("Handle bad request for error: %v", err)
+			fmt.Printf("Handle bad request for error , sending 404: %v", err)
 			res := &Response{}
 			res.send_static_400()
 			err = res.Write(conn)
@@ -151,6 +151,7 @@ func (s *Server) handleConnection(conn net.Conn) {
 
 		var file_loc string
 		if req.Host == "" {
+			fmt.Println("Host in request empty")
 			res := &Response{}
 			res.send_static_400()
 			err = res.Write(conn)
@@ -165,14 +166,15 @@ func (s *Server) handleConnection(conn net.Conn) {
 			file_loc = temp + req.URL
 		} else {
 			// Sending 400
+			fmt.Println("Host not present - return 404")
 			res := &Response{}
-			res.send_static_400()
+			res.send_static_404()
 			err2 := res.Write(conn)
 			if err2 != nil {
 				fmt.Println(err)
 			}
-			_ = conn.Close()
-			return
+
+			continue
 		}
 
 		fileInfo, err := os.Stat(file_loc)
@@ -232,8 +234,7 @@ func (s *Server) handleConnection(conn net.Conn) {
 			if err != nil {
 				fmt.Println(err)
 			}
-			_ = conn.Close()
-			return
+			continue
 		}
 
 	}
@@ -329,25 +330,21 @@ func ReadRequest(br *bufio.Reader) (req *Request, err error) {
 	req.Headers = make(map[string]string)
 	req.Method, err = parseRequestLine(line, 0)
 	if err != nil {
-		fmt.Println("NOP Error occured : ", err.Error())
+		fmt.Println("Error in Parsing header : ", err.Error())
 		return nil, badStringError("malformed start line", line)
 	}
 	req.Close = false
 	req.Proto, err = parseRequestLine(line, 2)
 	if err != nil {
-		fmt.Println("NOP Error occured : ", err.Error())
+		fmt.Println("Error in Parsing header :", err.Error())
 		return nil, badStringError("malformed start line", line)
 	}
 	if req.Proto != "HTTP/1.1" {
-		return nil, badStringError("malformed header", line)
+		return nil, badStringError("Bad protocol ", line)
 	}
 	req.URL, err = parseRequestLine(line, 1)
 	if err != nil {
-		fmt.Println("NOP Error occured : ", err.Error())
-		return nil, badStringError("malformed start line", line)
-	}
-
-	if err != nil {
+		fmt.Println("Error in Parsing header : ", err.Error())
 		return nil, badStringError("malformed start line", line)
 	}
 
@@ -364,13 +361,16 @@ func ReadRequest(br *bufio.Reader) (req *Request, err error) {
 			break
 		}
 		splitLine := strings.SplitN(line, ":", -1)
+
+		if len(splitLine) != 2 {
+			fmt.Println("Header not in format key : val", splitLine)
+			return req, fmt.Errorf("something went wrong... return 404")
+		}
+
 		for i := 0; i < len(splitLine); i++ {
 			splitLine[i] = strings.Trim(splitLine[i], " ")
 		}
-		if len(splitLine) != 2 {
-			fmt.Println("Something went wrong... TODO return 404", splitLine)
-			return req, fmt.Errorf("something went wrong... return 404")
-		}
+
 		if splitLine[0] == "Host" {
 			req.Host = splitLine[1]
 		} else if splitLine[0] == "Connection" && splitLine[1] == "close" {
@@ -398,6 +398,7 @@ func validMethod(method string) bool {
 }
 
 func badStringError(what, val string) error {
+	fmt.Println("BadStringError : ", what, val)
 	return fmt.Errorf("%s %q", what, val)
 }
 
@@ -406,13 +407,10 @@ func ReadLine(br *bufio.Reader) (string, error) {
 	for {
 		s, err := br.ReadString('\n')
 		line += s
-		// Return the error
 		if err != nil {
 			return line, err
 		}
-		// Return the line when reaching line end
 		if strings.HasSuffix(line, "\r\n") {
-			// Striping the line end
 			line = line[:len(line)-2]
 			return line, nil
 		}
