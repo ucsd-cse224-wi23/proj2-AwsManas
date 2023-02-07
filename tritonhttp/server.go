@@ -87,13 +87,14 @@ func ValidateSetup(Directory map[string]string) error {
 
 func (s *Server) handleConnection(conn net.Conn) {
 	br := bufio.NewReader(conn)
-	if err := conn.SetReadDeadline(time.Now().Add(5 * time.Second)); err != nil {
-		log.Printf("Failed to set timeout for connection %v", conn)
-		_ = conn.Close()
-		return
-	}
+
 	for {
 
+		if err := conn.SetReadDeadline(time.Now().Add(5 * time.Second)); err != nil {
+			log.Printf("Failed to set timeout for connection %v", conn)
+			_ = conn.Close()
+			return
+		}
 		req, err := ReadRequest(br)
 
 		if errors.Is(err, io.EOF) {
@@ -104,6 +105,16 @@ func (s *Server) handleConnection(conn net.Conn) {
 
 		if err, ok := err.(net.Error); ok && err.Timeout() {
 			log.Printf("Connection to %v timed out", conn.RemoteAddr())
+			// Sending 400
+			if req.Method != "" {
+				res := &Response{}
+				res.send_static_400()
+				err2 := res.Write(conn)
+				if err2 != nil {
+					fmt.Println(err)
+				}
+			}
+
 			_ = conn.Close()
 			return
 		}
@@ -111,7 +122,18 @@ func (s *Server) handleConnection(conn net.Conn) {
 		if err != nil {
 			log.Printf("Handle bad request for error: %v", err)
 			res := &Response{}
-			res.send_static_400(req.URL, req.Close)
+			res.send_static_400()
+			err = res.Write(conn)
+			if err != nil {
+				fmt.Println(err)
+			}
+			_ = conn.Close()
+			return
+		}
+
+		if strings.HasPrefix(req.URL, "/") {
+			res := &Response{}
+			res.send_static_400()
 			err = res.Write(conn)
 			if err != nil {
 				fmt.Println(err)
@@ -127,7 +149,32 @@ func (s *Server) handleConnection(conn net.Conn) {
 		if req.URL[len(req.URL)-1:] == "/" {
 			req.URL += "index.html"
 		}
-		file_loc := s.VirtualHosts[req.Host] + req.URL
+
+		var file_loc string
+		if req.Host == "" {
+			res := &Response{}
+			res.send_static_400()
+			err = res.Write(conn)
+			if err != nil {
+				fmt.Println(err)
+			}
+			_ = conn.Close()
+			return
+		}
+		temp, ok := s.VirtualHosts[req.Host]
+		if ok {
+			file_loc = temp + req.URL
+		} else {
+			// Sending 400
+			res := &Response{}
+			res.send_static_400()
+			err2 := res.Write(conn)
+			if err2 != nil {
+				fmt.Println(err)
+			}
+			_ = conn.Close()
+			return
+		}
 
 		fileInfo, err := os.Stat(file_loc)
 		if err != nil {
@@ -163,20 +210,45 @@ func (s *Server) handleConnection(conn net.Conn) {
 
 			fmt.Println("NOP Cant load file , some error occured ", err.Error())
 		}
+		cleaned_path := filepath.Clean(file_loc)
+		if strings.Contains(cleaned_path, s.VirtualHosts[req.Host]) {
+			// 200 response
+			res := &Response{}
+			res.send_static(file_loc, req.Close)
+			err = res.Write(conn)
+			if err != nil {
+				fmt.Println(err)
+			}
+			if req.Close == true {
+				_ = conn.Close()
+				return
+			}
+		} else {
 
-		// 200 response
-		res := &Response{}
-		res.send_static(file_loc, req.Close)
-		err = res.Write(conn)
-		if err != nil {
-			fmt.Println(err)
+			// 404 - Unauthorised access
+			fmt.Println("UnAuthorised access")
+			res := &Response{}
+			res.send_static_404()
+			err = res.Write(conn)
+			if err != nil {
+				fmt.Println(err)
+			}
+			_ = conn.Close()
+			return
 		}
 
 	}
 }
 
-func (res *Response) send_static_400(url string, close bool) {
-	panic("TODO")
+func (res *Response) send_static_400() {
+	res.Proto = "HTTP/1.1"
+	res.StatusCode = 400
+	res.StatusText = "Bad Request"
+	var tmp = map[string]string{
+		CanonicalHeaderKey("Date"):       string(FormatTime(time.Now())),
+		CanonicalHeaderKey("Connection"): "close",
+	}
+	res.Headers = tmp
 }
 
 func (res *Response) send_static_404() {
@@ -210,7 +282,9 @@ func (res *Response) send_static(url string, close bool) {
 		CanonicalHeaderKey("Content-Length"): fmt.Sprintf("%v", len(data)),
 		CanonicalHeaderKey("Last-Modified"):  string(FormatTime(fileInfo.ModTime())),
 		CanonicalHeaderKey("Date"):           string(FormatTime(time.Now())),
-		CanonicalHeaderKey("Connection"):     strconv.FormatBool(close),
+	}
+	if close {
+		tmp[CanonicalHeaderKey("Connection")] = strconv.FormatBool(close)
 	}
 	res.Headers = tmp
 	res.OptionalBody = data
@@ -257,15 +331,21 @@ func ReadRequest(br *bufio.Reader) (req *Request, err error) {
 	req.Method, err = parseRequestLine(line, 0)
 	if err != nil {
 		fmt.Println("NOP Error occured : ", err.Error())
+		return nil, badStringError("malformed start line", line)
 	}
 	req.Close = false
 	req.Proto, err = parseRequestLine(line, 2)
 	if err != nil {
 		fmt.Println("NOP Error occured : ", err.Error())
+		return nil, badStringError("malformed start line", line)
+	}
+	if req.Proto == "HTTP/1.1" {
+		return nil, badStringError("malformed header", line)
 	}
 	req.URL, err = parseRequestLine(line, 1)
 	if err != nil {
 		fmt.Println("NOP Error occured : ", err.Error())
+		return nil, badStringError("malformed start line", line)
 	}
 
 	if err != nil {
