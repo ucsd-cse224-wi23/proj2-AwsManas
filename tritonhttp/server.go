@@ -11,7 +11,6 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -283,8 +282,8 @@ func (res *Response) send_static(url string, close bool) {
 		CanonicalHeaderKey("Last-Modified"):  string(FormatTime(fileInfo.ModTime())),
 		CanonicalHeaderKey("Date"):           string(FormatTime(time.Now())),
 	}
-	if close {
-		tmp[CanonicalHeaderKey("Connection")] = strconv.FormatBool(close)
+	if close == true {
+		tmp[CanonicalHeaderKey("Connection")] = "close"
 	}
 	res.Headers = tmp
 	res.OptionalBody = data
