@@ -1,0 +1,18 @@
+HTTP/1.1 200 OK
+Content-Length: 191
+Content-Type: text/html; charset=utf-8
+Date: Wed, 08 Feb 2023 03:59:01 GMT
+Last-Modified: Sun, 05 Feb 2023 21:57:16 GMT
+
+<html>
+
+<head>
+    <title>Twice subdirectory file</title>
+</head>
+
+<body>
+    <h1>This is a basic index file for a double-subdirectory</h1>
+    You can use this for testing.
+</body>
+
+</html>

@@ -60,7 +60,7 @@ func (s *Server) ListenAndServe() error {
 		if err != nil {
 			continue
 		}
-		fmt.Println("accepted connection", conn.RemoteAddr())
+		fmt.Println("\n\n\accepted connection\n", conn.RemoteAddr())
 		go s.handleConnection(conn)
 	}
 
@@ -169,7 +169,7 @@ func (s *Server) handleConnection(conn net.Conn) {
 			// Sending 400
 			fmt.Println("Host not present - return 404")
 			res := &Response{}
-			res.send_static_404()
+			res.send_static_404(req.Close)
 			err2 := res.Write(conn)
 			if err2 != nil {
 				fmt.Println(err)
@@ -183,7 +183,7 @@ func (s *Server) handleConnection(conn net.Conn) {
 			if os.IsNotExist(err) {
 				log.Println("File doesnt exists ")
 				res := &Response{}
-				res.send_static_404()
+				res.send_static_404(req.Close)
 				err = res.Write(conn)
 				if err != nil {
 					fmt.Println(err)
@@ -201,7 +201,7 @@ func (s *Server) handleConnection(conn net.Conn) {
 			if os.IsNotExist(err) {
 				log.Println("File doesnt exists ")
 				res := &Response{}
-				res.send_static_404()
+				res.send_static_404(req.Close)
 				err = res.Write(conn)
 				if err != nil {
 					fmt.Println(err)
@@ -230,10 +230,14 @@ func (s *Server) handleConnection(conn net.Conn) {
 			// 404 - Unauthorised access
 			fmt.Println("UnAuthorised access")
 			res := &Response{}
-			res.send_static_404()
+			res.send_static_404(req.Close)
 			err = res.Write(conn)
 			if err != nil {
 				fmt.Println(err)
+			}
+			if req.Close == true {
+				_ = conn.Close()
+				return
 			}
 			continue
 		}
@@ -253,12 +257,15 @@ func (res *Response) send_static_400() {
 	fmt.Println("Sending back 400 response with following header :-", res)
 }
 
-func (res *Response) send_static_404() {
+func (res *Response) send_static_404(close bool) {
 	res.Proto = "HTTP/1.1"
 	res.StatusCode = 404
 	res.StatusText = "Not Found"
 	var tmp = map[string]string{
 		CanonicalHeaderKey("Date"): string(FormatTime(time.Now())),
+	}
+	if close == true {
+		tmp[CanonicalHeaderKey("Connection")] = "close"
 	}
 	res.Headers = tmp
 	fmt.Println("Sending back 404 response with following header :-", res)
@@ -292,7 +299,7 @@ func (res *Response) send_static(url string, close bool) {
 	res.Headers = tmp
 	res.OptionalBody = data
 
-	fmt.Println("Sending back 200 response with following header :-", res)
+	// fmt.Println("Sending back 200 response with following header :-", res)
 }
 
 func (res *Response) Write(w io.Writer) error {
@@ -375,13 +382,13 @@ func ReadRequest(br *bufio.Reader, req *Request) (err error) {
 			splitLine[i] = strings.Trim(splitLine[i], " ")
 		}
 
-		if splitLine[0] == "Host" {
+		if CanonicalHeaderKey(splitLine[0]) == "Host" {
 			req.Host = splitLine[1]
-		} else if splitLine[0] == "Connection" && splitLine[1] == "close" {
+		} else if CanonicalHeaderKey(splitLine[0]) == "Connection" && splitLine[1] == "close" {
 			req.Close = true
 		}
 
-		ky := splitLine[0]
+		ky := CanonicalHeaderKey(splitLine[0])
 		vl := splitLine[1]
 		req.Headers[ky] = vl
 
