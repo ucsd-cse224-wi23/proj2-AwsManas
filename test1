@@ -1,5 +1,0 @@
-GET /UCSD_Seal.png HTTP/1.1
-Host: website1
-Connection: close
-User-Agent: gotest
-

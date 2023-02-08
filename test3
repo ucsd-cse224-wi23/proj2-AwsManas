@@ -3,3 +3,4 @@ Connection:close
 Host:website1
 User-Agent:gotest
 
+date && go run main.go -req ./samples/input2.txt -resp ./samples/output2.txt localhost:8080 & go run main.go -req ./samples/input.txt -resp ./samples/output.txt localhost:8080
