@@ -1,0 +1,5 @@
+GET /subdir/subsubdir/index.html HTTP/1.1
+Connection:close
+Host:website1
+User-Agent:gotest
+

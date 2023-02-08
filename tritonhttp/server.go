@@ -94,7 +94,8 @@ func (s *Server) handleConnection(conn net.Conn) {
 			_ = conn.Close()
 			return
 		}
-		req, err := ReadRequest(br)
+		req := &Request{}
+		err := ReadRequest(br, req)
 
 		if errors.Is(err, io.EOF) {
 			fmt.Printf("Connection closed by %v \n", conn.RemoteAddr())
@@ -322,44 +323,43 @@ func (res *Response) Write(w io.Writer) error {
 	return nil
 }
 
-func ReadRequest(br *bufio.Reader) (req *Request, err error) {
-	req = &Request{}
+func ReadRequest(br *bufio.Reader, req *Request) (err error) {
 
 	// Read start line
 	line, err := ReadLine(br)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	req.Headers = make(map[string]string)
 	req.Method, err = parseRequestLine(line, 0)
 	if err != nil {
 		fmt.Println("Error in Parsing header : ", err.Error())
-		return nil, badStringError("malformed start line", line)
+		return badStringError("malformed start line", line)
 	}
 	req.Close = false
 	req.Proto, err = parseRequestLine(line, 2)
 	if err != nil {
 		fmt.Println("Error in Parsing header :", err.Error())
-		return nil, badStringError("malformed start line", line)
+		return badStringError("malformed start line", line)
 	}
 	if req.Proto != "HTTP/1.1" {
-		return nil, badStringError("Bad protocol ", line)
+		return badStringError("Bad protocol ", line)
 	}
 	req.URL, err = parseRequestLine(line, 1)
 	if err != nil {
 		fmt.Println("Error in Parsing header : ", err.Error())
-		return nil, badStringError("malformed start line", line)
+		return badStringError("malformed start line", line)
 	}
 
 	if !validMethod(req.Method) {
-		return nil, badStringError("invalid method", req.Method)
+		return badStringError("invalid method", req.Method)
 	}
 
 	for {
 		line, err := ReadLine(br)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		if line == "" {
 			break
@@ -368,7 +368,7 @@ func ReadRequest(br *bufio.Reader) (req *Request, err error) {
 
 		if len(splitLine) != 2 {
 			fmt.Println("Header not in format key : val", splitLine)
-			return req, fmt.Errorf("something went wrong... return 404")
+			return fmt.Errorf("something went wrong... return 404")
 		}
 
 		for i := 0; i < len(splitLine); i++ {
@@ -386,7 +386,7 @@ func ReadRequest(br *bufio.Reader) (req *Request, err error) {
 		req.Headers[ky] = vl
 
 	}
-	return req, nil
+	return nil
 }
 
 func parseRequestLine(line string, idx int) (string, error) {
