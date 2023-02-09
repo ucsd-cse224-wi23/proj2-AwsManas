@@ -104,7 +104,7 @@ func (s *Server) handleConnection(conn net.Conn) {
 		}
 
 		if err, ok := err.(net.Error); ok && err.Timeout() {
-			fmt.Printf("Connection to %v timed out", conn.RemoteAddr())
+			fmt.Printf("Connection to %v timed out \n", conn.RemoteAddr())
 			// Sending 400
 			if req.Method != "" {
 				res := &Response{}
@@ -120,7 +120,7 @@ func (s *Server) handleConnection(conn net.Conn) {
 		}
 
 		if err != nil {
-			fmt.Printf("Handle bad request for error , sending 400: %v", err)
+			fmt.Printf("Handle bad request for error , sending 400: %v \n", err)
 			res := &Response{}
 			res.send_static_400()
 			err = res.Write(conn)
@@ -143,7 +143,7 @@ func (s *Server) handleConnection(conn net.Conn) {
 		}
 
 		// Handle good request
-		fmt.Printf("Correct request : %v", req)
+		fmt.Printf("Correct request : %v \n", req)
 
 		// Correct the address
 		if req.URL[len(req.URL)-1:] == "/" {
