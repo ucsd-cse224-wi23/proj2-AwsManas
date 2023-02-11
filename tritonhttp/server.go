@@ -178,6 +178,7 @@ func (s *Server) handleConnection(conn net.Conn) {
 			continue
 		}
 
+		fmt.Println("file path: ", file_loc)
 		fileInfo, err := os.Stat(file_loc)
 		if err != nil {
 			if os.IsNotExist(err) {
@@ -188,8 +189,8 @@ func (s *Server) handleConnection(conn net.Conn) {
 				if err != nil {
 					fmt.Println(err)
 				}
-				_ = conn.Close()
-				return
+				// _ = conn.Close()
+				continue
 			}
 			fmt.Println("NOP Cant load file , some error occured ", err.Error())
 		}
@@ -206,8 +207,8 @@ func (s *Server) handleConnection(conn net.Conn) {
 				if err != nil {
 					fmt.Println(err)
 				}
-				_ = conn.Close()
-				return
+				// _ = conn.Close()
+				continue
 			}
 
 			fmt.Println("NOP Cant load file , some error occured ", err.Error())
